@@ -37,32 +37,25 @@ public class ServerAgent extends Thread{
         while(flag) {
             try {
                 String msg = din.readUTF();
+                System.out.println("这里收到了msg"+msg);
                 if(msg.startsWith("<#CONNECT#>")) {
-                    addAClient(msg);
+                    if(!addAClient(msg)) {
+                        setFlag(false);
+                        return ;
+                    }
                 } else if(msg.startsWith("<#EXIT#>")) {
-                    //退出一个client
                     removeAClient(msg);
                 }
             } catch(Exception e) {
+                //客户端退出需要对该客户端的所有相关信息进行清空
                 System.out.println("客户端已经退出");
+                removeAClient("<#EXIT#>"+this.sessionID);
                 flag = false;
             }
         }
     }
-    public void sendMsgtoClient(String msg) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    dout.writeUTF(msg);
-                } catch(Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
-    }
     //typical addAClient.msg   <#CONNECT#>LEADER#PWD | <#CONNECT#>LEADER#SESSIONID
-    public void addAClient(String msg) {
+    public boolean addAClient(String msg) {
         //新建立一个client
         msg = msg.substring(11);
         String[] msgSplits = msg.split("#");
@@ -70,19 +63,18 @@ public class ServerAgent extends Thread{
         int sessionID = 0;
         if(msgSplits[0].equals("LEADER")) {
             if(MainThread.sessionPWDtoID.get(msgSplits[1])!=null) {
-                //PWD已经存在返回错误信息
-                activateERROR("TYPE1");
-                return ;
+                sendMsgtoClient("<#CONNECT#>ERROR1");
+                return false;
             }
             clientType = ServerAgent.CLIENTYPE_LEANDER;
             sessionID = MainThread.sessionGlobalClock++;
             synchronized (MainThread.lock) {
-                MainThread.sessionPWDtoID.put(msgSplits[1], sessionID);      //建立pwd与sessionid的映射
+                MainThread.sessionPWDtoID.put(msgSplits[1], sessionID);
             }
         } else {
             if(MainThread.sessionPWDtoID.get(msgSplits[1])==null) {
-                activateERROR("TYPE2");
-                return ;
+                sendMsgtoClient("<#CONNECT#>ERROR2");
+                return false;
             }else {
                 sessionID = MainThread.sessionPWDtoID.get(msgSplits[1]);    //2
             }
@@ -103,6 +95,7 @@ public class ServerAgent extends Thread{
         }
         String successMsg = "<#CONNECT#>"+Integer.toString(clockID)+"#"+Integer.toString(sessionID);
         sendMsgtoClient(successMsg);
+        return true;
     }
     //任何成员退出导致游戏结束
     //remove需要关闭线程 删除sesssion相关的数据
@@ -144,5 +137,19 @@ public class ServerAgent extends Thread{
     }
     public void setFlag(boolean flag) {
         this.flag = flag;
+    }
+    public void sendMsgtoClient(final String msg) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    System.out.println(msg);
+                    ServerAgent.this.dout.writeUTF(msg);
+                } catch(Exception e) {
+                    System.out.println("发送出现了错误");
+                    e.printStackTrace();
+                }
+            }
+        }).start();
     }
 }
