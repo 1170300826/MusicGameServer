@@ -32,28 +32,35 @@ public class ServerAgent extends Thread{
             e.printStackTrace();
         }
     }
+
+
     @Override
     public void run() {
         while(flag) {
             try {
                 String msg = din.readUTF();
-                System.out.println("这里收到了msg"+msg);
+                System.out.println("这里收到了msg: "+msg);
                 if(msg.startsWith("<#CONNECT#>")) {
                     if(!addAClient(msg)) {
-                        setFlag(false);
-                        return ;
+                        //setFlag(false); 此处不应该暂停线程的工作
+                        //return ;/
                     }
                 } else if(msg.startsWith("<#EXIT#>")) {
                     removeAClient(msg);
+                } else if(msg.startsWith("<#DANMAKU#>")) {
+                    broadDanmaku(msg);
                 }
             } catch(Exception e) {
                 //客户端退出需要对该客户端的所有相关信息进行清空
                 System.out.println("客户端已经退出");
-                removeAClient("<#EXIT#>"+this.sessionID);
+                removeAClient("<#EXIT#>"+Integer.toString(this.clockID));
                 flag = false;
             }
         }
     }
+
+
+
     //typical addAClient.msg   <#CONNECT#>LEADER#PWD | <#CONNECT#>LEADER#SESSIONID
     public boolean addAClient(String msg) {
         //新建立一个client
@@ -93,30 +100,36 @@ public class ServerAgent extends Thread{
             MainThread.CIDtoSSID.put(clockID,sessionID);                    //3
             MainThread.clientCount += 1;
         }
-        String successMsg = "<#CONNECT#>"+Integer.toString(clockID)+"#"+Integer.toString(sessionID);
+        String successMsg = "<#CONNECT#>"+Integer.toString(clockID)+"#"+Integer.toString(clockID);
         sendMsgtoClient(successMsg);
         return true;
     }
     //任何成员退出导致游戏结束
     //remove需要关闭线程 删除sesssion相关的数据
     public void removeAClient(String msg) {
-        msg.substring(8);
-        int rmSessionID=MainThread.CIDtoSSID.get(msg);
+        msg = msg.substring(8);
+        int rmSessionID=MainThread.CIDtoSSID.getOrDefault(Integer.parseInt(msg),-1);
+        if(rmSessionID==-1){
+            System.out.println("删除失败");
+            return ;
+        }
+        synchronized (MainThread.lock) {
+            MainThread.CIDtoSSID.remove(msg);
+        }
         ArrayList<ServerAgent> listSA = MainThread.SSIDtoCLIENTSA.get(rmSessionID);
         //结束线程
         for(int i=0;i<listSA.size();i++) {
             ServerAgent thisclient = listSA.get(i);
-            if(thisclient.sessionID==rmSessionID) {
-                //向客户端发送消息 是客户端进行销毁反馈信息
-                String result = "<#DESTROY#>";
-                thisclient.sendMsgtoClient(result);
-                thisclient.interrupt();
-                thisclient.setFlag(false);
-                synchronized (MainThread.lock) {
-                    MainThread.clientCount--;
-                    MainThread.CIDtoSSID.remove(thisclient.clockID);        //1
-                }
+            if(thisclient.clockID == Integer.parseInt(msg)) continue;
+            //向其他客户端发送消息 是客户端进行销毁反馈信息
+            synchronized (MainThread.lock) {
+                MainThread.clientCount--;
+                MainThread.CIDtoSSID.remove(thisclient.clockID);        //1
             }
+            String result = "<#DESTROY#>";
+            thisclient.sendMsgtoClient(result);
+            thisclient.interrupt();
+            thisclient.setFlag(false);
         }
         //删除在PWDtoSSID中的所有相关线程数据
         String rmPWD = "";
@@ -131,9 +144,15 @@ public class ServerAgent extends Thread{
             MainThread.SSIDtoCLIENTSA.remove(rmSessionID);                  //3
         }
     }
-    public void activateERROR(final String ErrorType) {
-        sendMsgtoClient("<#ERROR#>"+ ErrorType);
-        this.setFlag(false);
+    public void broadDanmaku(String msg) {
+        msg = msg.substring(11);
+        String[] msgSplits =  msg.split("#");
+        ArrayList<ServerAgent> listsa = MainThread.SSIDtoCLIENTSA.get(
+                MainThread.CIDtoSSID.get(Integer.parseInt(msgSplits[0]))
+        );
+        for(ServerAgent sa:listsa) {
+            sa.sendMsgtoClient("<#DANMAKU#>"+msg);
+        }
     }
     public void setFlag(boolean flag) {
         this.flag = flag;
@@ -143,7 +162,7 @@ public class ServerAgent extends Thread{
             @Override
             public void run() {
                 try {
-                    System.out.println(msg);
+                    System.out.println("这里发布了msg: "+msg);
                     ServerAgent.this.dout.writeUTF(msg);
                 } catch(Exception e) {
                     System.out.println("发送出现了错误");
