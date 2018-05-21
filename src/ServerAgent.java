@@ -32,13 +32,12 @@ public class ServerAgent extends Thread{
         }
     }
 
-
     @Override
     public void run() {
         while(flag) {
             try {
                 String msg = din.readUTF();
-                System.out.println("这里收到了msg: "+msg);
+                System.out.println(String.format("IP:%s  MSG:%s",sc.getInetAddress(),msg));
                 if(msg.startsWith("<#CONNECT#>")) {
                     if(!addAClient(msg)) {
                     }
@@ -46,17 +45,22 @@ public class ServerAgent extends Thread{
                     removeAClient(msg);
                 } else if(msg.startsWith("<#DANMAKU#>")) {
                     broadDanmaku(msg);
+                } else if(msg.startsWith("<DESTROYTHREAD>")) {
+                    //与客户端的长连接关闭 此时切断当前client的处理线程
+                    this.onThreadDestroy();
+                    this.setFlag(false);
                 }
             } catch(Exception e) {
                 //客户端退出需要对该客户端的所有相关信息进行清空
-                System.out.println("客户端已经退出");
-                removeAClient("<#EXIT#>"+Integer.toString(this.clockID));
+                System.out.println("ERROR IN CLIENT\'S EXIT");
+                removeAClient("<#EXIT#>");
                 flag = false;
             }
         }
     }
-
-
+    //在线程关闭之前需要进行处理的事项
+    public void onThreadDestroy() {
+    }
 
     //typical addAClient.msg   <#CONNECT#>LEADER#PWD | <#CONNECT#>LEADER#SESSIONID
     public boolean addAClient(String msg) {
@@ -93,7 +97,7 @@ public class ServerAgent extends Thread{
         sendMsgtoClient(successMsg);
 
         try {
-            Thread.sleep(100);
+            Thread.sleep(500);
         } catch(Exception e) {
             e.printStackTrace();
         }
@@ -114,12 +118,10 @@ public class ServerAgent extends Thread{
             //需要结束所有房间成员的线程
             for (int i = 0; i < listSA.size(); i++) {
                 ServerAgent thisclient = listSA.get(i);
-                //不向leader发送该信息
+                //不向leader发送该信息 该信息意味着client需要回退acitivity重新选择房间进入
                 if (thisclient.clockID == this.clockID) continue;
                 String result = "<#DESTROY#>";
                 thisclient.sendMsgtoClient(result);
-                thisclient.interrupt();
-                thisclient.setFlag(false);
             }
             synchronized(MainThread.lock) {
                 MainThread.SSIDtoCLIENTSA.remove(sessionID);
@@ -139,7 +141,6 @@ public class ServerAgent extends Thread{
             synchronized (MainThread.lock) {
                 listSA.remove(rmi);
             }
-            System.out.println("现在的容量是："+Integer.toString(MainThread.SSIDtoCLIENTSA.size()));
         }
     }
     public void broadDanmaku(String msg) {
@@ -158,10 +159,10 @@ public class ServerAgent extends Thread{
             @Override
             public void run() {
                 try {
-                    System.out.println("这里发布了msg: "+msg);
                     ServerAgent.this.dout.writeUTF(msg);
+                    System.out.println("MSG SENDED : "+msg);
                 } catch(Exception e) {
-                    System.out.println("发送出现了错误");
+                    System.out.println("ERROR IN SENDING MSG");
                     e.printStackTrace();
                 }
             }
