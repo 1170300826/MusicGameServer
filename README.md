@@ -1,12 +1,21 @@
-# MusicGameServer
+# TEMP_Music
+## Features:
+* HIT大一年度项目
+* 网络Server端代码
+* 基于Java与Socket实现通信
+* 游戏思路来自于音乐游戏《钢琴键》
+* 游戏创新的地方在于多人游戏，多人合作进行游戏乐谱的制作，上传服务器后可以下载已经上传的乐谱进行单人游戏。
 
-**Features:**
->A server code belongs to Android Project **TEMP MUSIC**
+## What's Important:
+* 如何增强多人游戏服务器健壮性
+* 如何进行服务器与activity之间的通信，长时间连接通信原理
+* 游戏数据的存储，实现原理
+* 多线程同时调用的问题，尝试提供一个锁机制
 
->which is based on java and socket
+## TODO:
+> 多人游戏模式正在进行
+> <br> 网络交互server正在开发
+> <br>强制退出后房间信息的删除问题
 
-**Link**
->Android Code is [HERE]("https://github.com/hahalidaxin/TEMP_Music")
 
-**INFO:**
->built on 2018/5/16 by hahalidaxin
+> Since 2018/5/7

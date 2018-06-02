@@ -1,3 +1,7 @@
+package Thread;
+
+import data.ClientTeamData;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
@@ -37,7 +41,9 @@ public class ServerAgent extends Thread {
         while (flag) {
             try {
                 String msg = din.readUTF();
-                System.out.println(String.format("IP:%s  MSG:%s", sc.getInetAddress(), msg));
+                String[] msgSplits;
+                if(!msg.equals("HEART_BEAT_MSG"))
+                    System.out.println(String.format("IP:%s  MSG:%s", sc.getInetAddress(), msg));
                 if (msg.startsWith("<#CONNECT#>")) {
                     if (!addAClient(msg)) {
                     }
@@ -52,6 +58,10 @@ public class ServerAgent extends Thread {
                 } else if (msg.startsWith("<#BUTTONPRESSED#>")) {    //按下开始游戏按钮 传递更换activity的信息
                     onButtonPressed(msg);
                 }
+                else if(msg.startsWith("<#WAITVIEW#>")) {
+                    msgSplits = msg.substring(12).split("#");
+                    activityWait(msg,msgSplits);
+                }
             } catch (Exception e) {
                 //客户端退出需要对该客户端的所有相关信息进行清空
                 System.out.println("ERROR IN CLIENT\'S EXIT");
@@ -63,10 +73,11 @@ public class ServerAgent extends Thread {
     }
         //在线程关闭之前需要进行处理的事项
         public void onThreadDestroy () {
+
         }
 
         //typical addAClient.msg   <#CONNECT#>LEADER#PWD | <#CONNECT#>LEADER#SESSIONID
-        public boolean addAClient (String msg){
+        public boolean addAClient (String msg) {
             //新建立一个client
             msg = msg.substring(11);
             String[] msgSplits = msg.split("#");
@@ -89,33 +100,23 @@ public class ServerAgent extends Thread {
             this.clockID = MainThread.clientGlobalClock++;
             synchronized (MainThread.lock) {
                 if (clientType == CLIENTYPE_LEANDER) {
-                    ArrayList<ServerAgent> listSA = new ArrayList<>();
-                    listSA.add(this);
-                    MainThread.SSIDtoCLIENTSA.put(this.sessionID, listSA);           //1
+                    ClientTeamData data = new ClientTeamData();
+                    data.listsa.add(this);
+                    MainThread.SSIDtoCLIENTSA.put(this.sessionID, data);           //1
                 } else {
-                    MainThread.SSIDtoCLIENTSA.get(sessionID).add(this);
+                    MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.add(this);
                 }
             }
             String successMsg = "<#CONNECT#>" + Integer.toString(clockID) + "#" + Integer.toString(clockID);
             sendMsgtoClient(successMsg);
 
-            try {
-                Thread.sleep(500);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            //通知所有的同组成员改变显示人数
-            successMsg = "<#SHOWNUMBER#>" + Integer.toString(MainThread.SSIDtoCLIENTSA.get(sessionID).size());
-            ArrayList<ServerAgent> listsa = MainThread.SSIDtoCLIENTSA.get(sessionID);
-            for (ServerAgent sa : listsa) {
-                sa.sendMsgtoClient(successMsg);
-            }
+            updateTeamInfo(sessionID);
             return true;
         }
         //任何成员退出导致游戏结束
         //remove需要关闭线程 删除sesssion相关的数据
         public void removeAClient (String msg){
-            ArrayList<ServerAgent> listSA = MainThread.SSIDtoCLIENTSA.get(sessionID);
+            ArrayList<ServerAgent> listSA = MainThread.SSIDtoCLIENTSA.get(sessionID).listsa;
             //结束线程
             if (isLeader == CLIENTYPE_LEANDER) {
                 //需要结束所有房间成员的线程
@@ -131,7 +132,7 @@ public class ServerAgent extends Thread {
                 }
             } else {
                 //清空个人信息，向其他成员发送人数信息
-                String Msg = "<#SHOWNUMBER#>" + Integer.toString((MainThread.SSIDtoCLIENTSA.get(sessionID).size()) - 1);
+                String Msg = "<#SHOWNUMBER#>" + Integer.toString((MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.size()) - 1);
                 int rmi = 0;
                 for (int i = 0; i < listSA.size(); i++) {
                     ServerAgent thisclient = listSA.get(i);
@@ -149,7 +150,7 @@ public class ServerAgent extends Thread {
         public void broadDanmaku (String msg){
             msg = msg.substring(11);
             String[] msgSplits = msg.split("#");
-            ArrayList<ServerAgent> listsa = MainThread.SSIDtoCLIENTSA.get(sessionID);
+            ArrayList<ServerAgent> listsa = MainThread.SSIDtoCLIENTSA.get(sessionID).listsa;
             for (ServerAgent sa : listsa) {
                 sa.sendMsgtoClient("<#DANMAKU#>" + msg);
             }
@@ -157,25 +158,77 @@ public class ServerAgent extends Thread {
         public void setFlag ( boolean flag){
             this.flag = flag;
         }
-        public void sendMsgtoClient ( final String msg){
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        ServerAgent.this.dout.writeUTF(msg);
-                        System.out.println("MSG SENDED : " + msg);
-                    } catch (Exception e) {
-                        System.out.println("ERROR IN SENDING MSG");
-                        e.printStackTrace();
-                    }
-                }
-            }).start();
-        }
         public void onButtonPressed(String msg) {
             //向组内服务器传递ButtonPressed的信息
-            ArrayList<ServerAgent> lista = MainThread.SSIDtoCLIENTSA.get(sessionID);
-            for ServerAgent sa: lista {
+            ClientTeamData data = MainThread.SSIDtoCLIENTSA.get(sessionID);
+            for (ServerAgent sa: data.listsa) {
                 sa.sendMsgtoClient(msg);
+            }
+        }
+        public void activityWait(String msg,String[] msgSplits) {
+            String text;
+            int[] initFlag = MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag;
+            if (msgSplits[0].equals(Integer.toString(clockID))) {
+                if (msgSplits[1].startsWith("INSTRU")) {
+                    int rk = msgSplits[1].charAt(6) - '0';
+                    if (msgSplits[2].equals("SELECT")) { //选择当前的按钮
+                        if (initFlag[rk] == -1 || initFlag[rk] == clockID) {    //可以进行选择
+                            for (int i = 0; i < 4; i++)
+                                if (initFlag[i] == clockID) {
+                                    initFlag[i] = -1;
+                                    //System.out.println(MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag[i]);
+                                    MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag[i]=-1;
+                                    sendMsgtoTeam(sessionID, String.format("<#WAITVIEW#>%d#INSTRU%d#UNSELECT", clockID, i));
+                                }
+                            initFlag[rk] = clockID;
+                            text = msg;
+                        } else {            //不允许选择
+                            text = String.format("<#WAITVIEW#>%d#INSTRUFALSE", clockID);
+                        }
+                        sendMsgtoTeam(sessionID, text);
+                    } else {    //取消选择当前的按钮
+                        if(initFlag[rk]==clockID) {
+                            sendMsgtoTeam(sessionID,msg);
+                        }
+                    }
+                }
+            }
+        }
+        public void sendMsgtoClient (final String msg) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    ServerAgent.this.dout.writeUTF(msg);
+                    System.out.println("MSG SENDED : " + msg);
+                } catch (Exception e) {
+                    System.out.println("ERROR IN SENDING MSG");
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
+        public void sendMsgtoTeam(String sessionID,String msg) {
+        //向sessionID的小组内发送msg信息
+            ArrayList<ServerAgent> listsa = MainThread.SSIDtoCLIENTSA.get(sessionID).listsa;
+            for (ServerAgent sa:listsa){
+                sa.sendMsgtoClient(msg);
+            }
+        }
+        public void updateTeamInfo(String sessionID) {
+            //等待activity的跳转时间
+            try {
+                Thread.sleep(500);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            //通知所有的同组成员改变显示人数
+            String successMsg = "<#SHOWNUMBER#>" + Integer.toString(MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.size());
+            sendMsgtoTeam(sessionID,successMsg);
+            //向该client传递更新view信息的msg
+            int[] instruFlag = MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag;
+            for(int i=0;i<4;i++) if(instruFlag[i]!=-1) {
+                sendMsgtoClient(String.format("<#WAITVIEW#>%d#INSTRU%d#SELECT",instruFlag[i],i));
             }
         }
 }
