@@ -1,16 +1,10 @@
 package test;
-
-import java.util.ArrayList;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class test {
     public static void main(String[] args) {
-        class phone {
-            public int[] ls = new int[4];
-            public int rk = 0;
-            public ArrayList<Integer> list = new ArrayList<>();
-            public phone() {
-
-            }
-        }
+        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd-HH-mm");
+        System.out.println(df.format(new Date()));
     }
 }

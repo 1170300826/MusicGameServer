@@ -13,7 +13,9 @@ public class ClientTeamData {
     public boolean[] uploadFlag = new boolean[4];        //上传乐谱的标志
     public String musicName;
     public MusicManager music;
+    public String date;
     public ClientTeamData() {
+        date = "";
         teamState = 0;
         mateNumber = 0;
         musicName = "";

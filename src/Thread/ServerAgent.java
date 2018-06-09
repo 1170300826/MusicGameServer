@@ -6,7 +6,9 @@ import data.MusicManager;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 
 //单独一个client的thread用来处理相关的处理操作
 //这里对于每一个与server连接的client分配一个serverAgent处理线程
@@ -123,6 +125,10 @@ public class ServerAgent extends Thread {
                     MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.add(this);
                 }
             }
+            if(isLeader == CLIENTYPE_LEANDER) {
+                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
+                MainThread.SSIDtoCLIENTSA.get(sessionID).date =  df.format(new Date());
+            }
             String successMsg = "<#CONNECT#>" + Integer.toString(clockID) + "#" + Integer.toString(clockID);
             sendMsgtoClient(successMsg);
 
@@ -132,6 +138,7 @@ public class ServerAgent extends Thread {
         //任何成员退出导致游戏结束
         //remove需要关闭线程 删除sesssion相关的数据
         public void removeAClient (String msg) {
+            if(MainThread.SSIDtoCLIENTSA.get(sessionID)==null) return ;
             ArrayList<ServerAgent> listSA = MainThread.SSIDtoCLIENTSA.get(sessionID).listsa;
             if(listSA==null || listSA.size()==0) return ;
             if(!listSA.contains(this)) return ;
@@ -236,7 +243,8 @@ public class ServerAgent extends Thread {
                 MainThread.SSIDtoCLIENTSA.get(sessionID).musicName=msgSplits[0];
             }
             MainThread.SSIDtoCLIENTSA.get(sessionID).uploadFlag[Integer.parseInt(msgSplits[1])] = true;
-            manager.onMusicReceived(msgSplits[0],msgSplits[1],msgSplits[2],msgSplits[3]);
+            String date = MainThread.SSIDtoCLIENTSA.get(sessionID).date;
+            manager.onMusicReceived(msgSplits[0]+msgSplits[1]+"-"+date,msgSplits[3]);
             sendMsgtoClient("<#MUSICOVERVIEW#>RECEIVED");
             //需要向leader发送 更新人数信息的msg
             if(isLeader==CLIENTYPE_NOARMAL) MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.remove(this);
