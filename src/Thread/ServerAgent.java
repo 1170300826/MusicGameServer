@@ -61,6 +61,12 @@ public class ServerAgent extends Thread {
                 else if(msg.startsWith("<#WAITVIEW#>")) {
                     msgSplits = msg.substring(12).split("#");
                     activityWait(msg,msgSplits);
+                } else if(msg.startsWith("<#MUSICOVERVIEW#>")) {
+                    msg = msg.substring(17);
+                    if(msg.startsWith("MUSICSENDED")) {
+                        msg = msg.substring(12);
+                        onMusicReceived(msg);
+                    }
                 }
             } catch (Exception e) {
                 //客户端退出需要对该客户端的所有相关信息进行清空
@@ -192,6 +198,8 @@ public class ServerAgent extends Thread {
                         }
                     }
                 }
+            }else if(msgSplits[0].equals("STARTGAME")) {
+                sendMsgtoTeam(sessionID,msg);
             }
         }
         public void sendMsgtoClient (final String msg) {
@@ -230,5 +238,11 @@ public class ServerAgent extends Thread {
             for(int i=0;i<4;i++) if(instruFlag[i]!=-1) {
                 sendMsgtoClient(String.format("<#WAITVIEW#>%d#INSTRU%d#SELECT",instruFlag[i],i));
             }
+        }
+        public void onMusicReceived(String msg) {
+            String[] msgSplits = msg.split("#");
+            //MusicManager manager = MainThread.SSIDtoCLIENTSA.get(sessionID).music;
+            //manager.onMusicReceived(msgSplits[0],msgSplits[1],msgSplits[2],msgSplits[3]);
+            sendMsgtoClient("<#MUSICOVERVIEW#>RECEIVED");
         }
 }

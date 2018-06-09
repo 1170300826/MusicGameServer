@@ -12,14 +12,5 @@ public class test {
 
             }
         }
-        phone c = new phone();
-        ArrayList<Integer> list = c.list;
-        int x = c.rk;
-        c.rk=12;
-        list.add(12);
-        list.add(23123);
-        int[] z = c.ls;
-        z[0]=12;
-        System.out.println(c.ls[0]);
     }
 }

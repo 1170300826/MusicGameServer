@@ -8,9 +8,11 @@ import java.util.ArrayList;
 public class ClientTeamData {
     public ArrayList<ServerAgent> listsa; //所有serverAgent的句柄
     public int[] instruFlag;            //四个乐器的标志位
+    public MusicManager music;
     public ClientTeamData() {
         listsa = new ArrayList<>();
         instruFlag = new int[4];
         for(int i=0;i<4;i++) instruFlag[i]=-1;
+        music = new MusicManager();
     }
 }
