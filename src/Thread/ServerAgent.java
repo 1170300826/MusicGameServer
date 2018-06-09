@@ -1,6 +1,7 @@
 package Thread;
 
 import data.ClientTeamData;
+import data.MusicManager;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -79,15 +80,18 @@ public class ServerAgent extends Thread {
     }
         //在线程关闭之前需要进行处理的事项
         public void onThreadDestroy () {
-
+            try {
+                removeAClient("<EXIT>");
+            } catch(Exception e) {
+                e.printStackTrace();
+            }
         }
-
         //typical addAClient.msg   <#CONNECT#>LEADER#PWD | <#CONNECT#>LEADER#SESSIONID
         public boolean addAClient (String msg) {
             //新建立一个client
             msg = msg.substring(11);
             String[] msgSplits = msg.split("#");
-            int clientType = ServerAgent.CLIENTYPE_NOARMAL;
+            int clientType;
             if (msgSplits[0].equals("LEADER")) {
                 if (MainThread.SSIDtoCLIENTSA.get(msgSplits[1]) != null) {
                     sendMsgtoClient("<#CONNECT#>ERROR1");
@@ -95,9 +99,15 @@ public class ServerAgent extends Thread {
                 }
                 clientType = ServerAgent.CLIENTYPE_LEANDER;
             } else {
+                //需要对新加入的client进行检查 如果team已经在游戏 则不能加入
                 clientType = ServerAgent.CLIENTYPE_NOARMAL;
                 if (MainThread.SSIDtoCLIENTSA.get(msgSplits[1]) == null) {
                     sendMsgtoClient("<#CONNECT#>ERROR2");
+                    return false;
+                }
+                //游戏已经开始 进入房间错误
+                if(MainThread.SSIDtoCLIENTSA.get(msgSplits[1]).teamState==1) {
+                    sendMsgtoClient("<#CONNECT#>ERROR3");
                     return false;
                 }
             }
@@ -121,11 +131,12 @@ public class ServerAgent extends Thread {
         }
         //任何成员退出导致游戏结束
         //remove需要关闭线程 删除sesssion相关的数据
-        public void removeAClient (String msg){
+        public void removeAClient (String msg) {
             ArrayList<ServerAgent> listSA = MainThread.SSIDtoCLIENTSA.get(sessionID).listsa;
+            if(listSA==null || listSA.size()==0) return ;
+            if(!listSA.contains(this)) return ;
             //结束线程
             if (isLeader == CLIENTYPE_LEANDER) {
-                //需要结束所有房间成员的线程
                 for (int i = 0; i < listSA.size(); i++) {
                     ServerAgent thisclient = listSA.get(i);
                     //不向leader发送该信息 该信息意味着client需要回退acitivity重新选择房间进入
@@ -150,6 +161,13 @@ public class ServerAgent extends Thread {
                 }
                 synchronized (MainThread.lock) {
                     listSA.remove(rmi);
+                }
+                //全部的成员已经退出：需要清理team数据 同时保存team信息
+                if(MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.size()==0) {
+                    //保存team数据
+                    MusicManager manager = MainThread.SSIDtoCLIENTSA.get(sessionID).music;
+                    manager.onMusicOver(MainThread.SSIDtoCLIENTSA.get(sessionID));
+                    MainThread.SSIDtoCLIENTSA.remove(sessionID);
                 }
             }
         }
@@ -178,30 +196,55 @@ public class ServerAgent extends Thread {
                 if (msgSplits[1].startsWith("INSTRU")) {
                     int rk = msgSplits[1].charAt(6) - '0';
                     if (msgSplits[2].equals("SELECT")) { //选择当前的按钮
-                        if (initFlag[rk] == -1 || initFlag[rk] == clockID) {    //可以进行选择
+                        if(initFlag[rk]==clockID) {
+                            MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag[rk]=-1;
+                            sendMsgtoTeam(sessionID,"<#WAITVIEW#>"+msgSplits[0]+"#"+msgSplits[1]+"#UNSELECT");
+                        } else if (initFlag[rk] == -1) {    //可以进行选择
                             for (int i = 0; i < 4; i++)
                                 if (initFlag[i] == clockID) {
-                                    initFlag[i] = -1;
+                                    MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag[rk]=-1;
                                     //System.out.println(MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag[i]);
                                     MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag[i]=-1;
                                     sendMsgtoTeam(sessionID, String.format("<#WAITVIEW#>%d#INSTRU%d#UNSELECT", clockID, i));
                                 }
                             initFlag[rk] = clockID;
                             text = msg;
+                            sendMsgtoTeam(sessionID, text);
                         } else {            //不允许选择
                             text = String.format("<#WAITVIEW#>%d#INSTRUFALSE", clockID);
+                            sendMsgtoClient(text);
                         }
-                        sendMsgtoTeam(sessionID, text);
-                    } else {    //取消选择当前的按钮
-                        if(initFlag[rk]==clockID) {
-                            sendMsgtoTeam(sessionID,msg);
-                        }
+
                     }
                 }
             }else if(msgSplits[0].equals("STARTGAME")) {
-                sendMsgtoTeam(sessionID,msg);
+                int[]  instruFlag = MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag;
+                MainThread.SSIDtoCLIENTSA.get(sessionID).teamState = 1;
+                int cnt = 0;
+                for(int i=0;i<4;i++) if(instruFlag[i]!=-1) cnt++;
+                if(cnt==MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.size()) {
+                    sendMsgtoTeam(sessionID,msg);
+                } else {
+                    sendMsgtoClient("<#WAITVIEW#>STARTFALSE1");     //不是所有的成员都已经选中了乐器
+                }
             }
         }
+        public void onMusicReceived(String msg) {
+            String[] msgSplits = msg.split("#");
+            MusicManager manager = MainThread.SSIDtoCLIENTSA.get(sessionID).music;
+            if(MainThread.SSIDtoCLIENTSA.get(sessionID).musicName=="") {
+                MainThread.SSIDtoCLIENTSA.get(sessionID).musicName=msgSplits[0];
+            }
+            MainThread.SSIDtoCLIENTSA.get(sessionID).uploadFlag[Integer.parseInt(msgSplits[1])] = true;
+            manager.onMusicReceived(msgSplits[0],msgSplits[1],msgSplits[2],msgSplits[3]);
+            sendMsgtoClient("<#MUSICOVERVIEW#>RECEIVED");
+            //需要向leader发送 更新人数信息的msg
+            if(isLeader==CLIENTYPE_NOARMAL) MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.remove(this);
+            int size = MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.size();
+            sendMsgtoTeam(sessionID,String.format("<#MUSICOVERVIEW#>NUMBER#%d",size));
+        }
+
+        //------------Util Module------------------------
         public void sendMsgtoClient (final String msg) {
         new Thread(new Runnable() {
             @Override
@@ -238,11 +281,5 @@ public class ServerAgent extends Thread {
             for(int i=0;i<4;i++) if(instruFlag[i]!=-1) {
                 sendMsgtoClient(String.format("<#WAITVIEW#>%d#INSTRU%d#SELECT",instruFlag[i],i));
             }
-        }
-        public void onMusicReceived(String msg) {
-            String[] msgSplits = msg.split("#");
-            //MusicManager manager = MainThread.SSIDtoCLIENTSA.get(sessionID).music;
-            //manager.onMusicReceived(msgSplits[0],msgSplits[1],msgSplits[2],msgSplits[3]);
-            sendMsgtoClient("<#MUSICOVERVIEW#>RECEIVED");
         }
 }

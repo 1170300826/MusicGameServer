@@ -11,11 +11,12 @@ public class IOManager {
     BufferedWriter writer;
     int ioType;
 
-    public IOManager(String filename,int ioType) {
+    public IOManager(String filename,int ioType,boolean flag) {
+        filename = "serverdata/"+filename+".txt";
         this.ioType = ioType;
         try {
             if (ioType == FILE_WRITE) {
-                out = new FileOutputStream(filename);
+                out = new FileOutputStream(filename,flag);
                 writer = new BufferedWriter(new OutputStreamWriter(out));
             } else {
                 in = new FileInputStream(filename);
