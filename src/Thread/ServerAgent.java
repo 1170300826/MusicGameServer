@@ -50,6 +50,10 @@ public class ServerAgent extends Thread {
                 if (msg.startsWith("<#CONNECT#>")) {
                     if (!addAClient(msg)) {
                     }
+                } else if(msg.startsWith('#CONNECT2#')) {
+                    if(!addAClient(msg)) {
+                    }
+                    MainThread.SSIDtoCLIENTSA.get(sessionID).connectType = 1;       //连接类型
                 } else if (msg.startsWith("<#EXIT#>")) {
                     removeAClient(msg);
                 } else if (msg.startsWith("<#DANMAKU#>")) {

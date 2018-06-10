@@ -6,6 +6,7 @@ import java.util.ArrayList;
 // 在MainThread中需要存储的所有类型
 
 public class ClientTeamData {
+    public int connectType;     //标志着连接的类型 0-编曲activity 1-play流程
     public int teamState;       //0-选择等待界面 1-游戏进行
     public int mateNumber;
     public ArrayList<ServerAgent> listsa; //所有serverAgent的句柄
@@ -15,6 +16,7 @@ public class ClientTeamData {
     public MusicManager music;
     public String date;
     public ClientTeamData() {
+        connectType = 0;
         date = "";
         teamState = 0;
         mateNumber = 0;
