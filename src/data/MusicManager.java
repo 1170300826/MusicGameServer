@@ -16,19 +16,19 @@ public class MusicManager {
         io.onDestroy();
     }
     public void onMusicReceived(String name,String msg) {
+        NameParser parser = new NameParser(name);
+
         if(clientNum==0) {
             IOManager ls = new IOManager("MusicList",IOManager.FILE_WRITE,true);
-            ls.write(name+'\n');
+            ls.write(parser.withoutType()+"\n");
             ls.onDestroy();
         }
         clientNum++;
         //记录该组内的乐器组成
-        String[] msgSplits = msg.split("-");
-        char type = msgSplits[0].charAt(msgSplits[0].length()-1);
-        IOManager info = new IOManager(msgSplits[0].substring(0,msgSplits[0].length()-1),IOManager.FILE_WRITE,true);
-        info.write(String.format("%c\n",type));
-        info.onDestroy();
-
+        System.out.println(parser.withoutType());
+        IOManager io = new IOManager(parser.withoutType(),IOManager.FILE_WRITE,true);
+        io.write(String.format("%d \n",parser.getType()));
+        io.onDestroy();
         addMusicInstru(name,msg);
     }
     public void onMusicOver(ClientTeamData data)  {    //小组内的所有成员都已经退出
@@ -36,10 +36,9 @@ public class MusicManager {
         StringBuffer builder = new StringBuffer();
         for(int i=0;i<4;i++)
             if(data.instruFlag[i]!=-1) {
-                builder.append(String.format("%d ",i));
+                builder.append(String.format("%d",i));
             }
         io.write(builder.toString());
         io.onDestroy();
     }
-
 }

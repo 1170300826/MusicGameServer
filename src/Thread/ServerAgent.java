@@ -64,7 +64,7 @@ public class ServerAgent extends Thread {
                 }
                 else if(msg.startsWith("<#WAITVIEW#>")) {
                     msgSplits = msg.substring(12).split("#");
-                    activityWait(msg,msgSplits);
+                    onWaitView(msg,msgSplits);
                 } else if(msg.startsWith("<#MUSICOVERVIEW#>")) {
                     msg = msg.substring(17);
                     if (msg.startsWith("MUSICSENDED")) {
@@ -110,16 +110,22 @@ public class ServerAgent extends Thread {
             } else {
                 //需要对新加入的client进行检查 如果team已经在游戏 则不能加入
                 clientType = ServerAgent.CLIENTYPE_NOARMAL;
-                if (MainThread.SSIDtoCLIENTSA.get(msgSplits[1]) == null
-                        || MainThread.SSIDtoCLIENTSA.get(msgSplits[1]).teamState==-1) {
-                    sendMsgtoClient("<#CONNECT#>ERROR2");
+                ClientTeamData data = MainThread.SSIDtoCLIENTSA.get(msgSplits[1]);
+                //加入房间的错误处理
+                if (data == null) { //没有房间
+                    sendMsgtoClient("<#CONNECT#>ERROR1");
                     return false;
-                }
-                //游戏已经开始 进入房间错误
-                if(MainThread.SSIDtoCLIENTSA.get(msgSplits[1]).teamState==1) {
+                }else if(MainThread.SSIDtoCLIENTSA.get(msgSplits[1]).teamState==1) {    //已经刚开始游戏
                     sendMsgtoClient("<#CONNECT#>ERROR3");
                     return false;
+                } else if(MainThread.SSIDtoCLIENTSA.get(msgSplits[1]).teamState==-1) {  //房主仍然在选择
+                    sendMsgtoClient("<#CONNECT#>ERROR4");
+                    return false;
+                } else if(data.teamNumberLimit <= data.listsa.size()) { //房间人数已经满
+                        sendMsgtoClient("<#CONNECT#>ERROR2");
+                        return false;
                 }
+
             }
             this.isLeader = clientType;
             this.sessionID = msgSplits[1];
@@ -137,9 +143,12 @@ public class ServerAgent extends Thread {
                 SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
                 MainThread.SSIDtoCLIENTSA.get(sessionID).date =  df.format(new Date());
             }
-            String successMsg = "<#CONNECT#>" + Integer.toString(clockID) + "#" + Integer.toString(clockID);
+            //在msg中尝试加入更多与 isntru显示相关的数据
+            String successMsg = "<#CONNECT#>" + Integer.toString(clockID) + "#" + sessionID+"#";
+            if(isLeader==CLIENTYPE_NOARMAL) {
+                successMsg += MainThread.SSIDtoCLIENTSA.get(sessionID).strInstruNum;
+            }
             sendMsgtoClient(successMsg);
-
             updateTeamInfo(sessionID);
             return true;
         }
@@ -204,10 +213,10 @@ public class ServerAgent extends Thread {
                 sa.sendMsgtoClient(msg);
             }
         }
-        public void activityWait(String msg,String[] msgSplits) {
+        public void onWaitView(String msg,String[] msgSplits) {
             String text;
+            ClientTeamData data = MainThread.SSIDtoCLIENTSA.get(sessionID);
             int[] initFlag = MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag;
-            if (msgSplits[0].equals(Integer.toString(clockID))) {
                 if (msgSplits[1].startsWith("INSTRU")) {
                     int rk = msgSplits[1].charAt(6) - '0';
                     if (msgSplits[2].equals("SELECT")) { //选择当前的按钮
@@ -231,18 +240,28 @@ public class ServerAgent extends Thread {
                         }
 
                     }
-                }
-            }else if(msgSplits[0].equals("STARTGAME")) {
-                int[]  instruFlag = MainThread.SSIDtoCLIENTSA.get(sessionID).instruFlag;
+                } else if(msgSplits[0].equals("STARTGAME")) {
+                int[]  instruFlag = data.instruFlag;
                 MainThread.SSIDtoCLIENTSA.get(sessionID).teamState = 1;
                 int cnt = 0;
                 for(int i=0;i<4;i++) if(instruFlag[i]!=-1) cnt++;
-                if(cnt==MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.size()) {
+                if(cnt==data.listsa.size()) {
                     sendMsgtoTeam(sessionID,msg);
                 } else {
                     sendMsgtoClient("<#WAITVIEW#>STARTFALSE1");     //不是所有的成员都已经选中了乐器
                 }
-            }
+            } else if(msgSplits[0].startsWith("STARTGAME&MUSIC")) {
+                int instruType = Integer.parseInt(msgSplits[1]);
+                String fname = data.chooseMusicName;
+                int x = fname.indexOf("-");
+                fname = fname.substring(0,x)+Integer.toString(instruType)+fname.substring(x);
+                IOManager io = new IOManager(fname,IOManager.FILE_READ,false);
+                String ans = io.read();
+                io.onDestroy();
+                sendMsgtoClient("<#WAITVIEW#>STARTGAME&MUSIC#"+ans);
+            } else if(msgSplits[0].startsWith("INSTRUNUMLIMIT")) {
+                    MainThread.SSIDtoCLIENTSA.get(sessionID).teamNumberLimit = Integer.parseInt(msgSplits[1].trim());
+                }
         }
         public void onMusicReceived(String msg) {
             String[] msgSplits = msg.split("#");
@@ -261,23 +280,35 @@ public class ServerAgent extends Thread {
         }
         public void onChooseView(String msg) {
             String[] msgSplits = msg.split("#");
-            String filename = msgSplits[1];
-            IOManager reader = new IOManager(filename,IOManager.FILE_READ,false);
-            String ans = reader.read();
-            ans = ans.replace('\n',' ');
-            reader.onDestroy();
-            sendMsgtoClient(ans);
+            if(msg.startsWith("MUSICSELECT")) {
+                String filename = msgSplits[1];
+                IOManager reader = new IOManager(filename, IOManager.FILE_READ, false);
+                String ans = reader.read();
+                reader.onDestroy();
+                MainThread.SSIDtoCLIENTSA.get(sessionID).chooseMusicName = filename;
+                MainThread.SSIDtoCLIENTSA.get(sessionID).strInstruNum = ans;            //记录小组中的乐器可使用情况
+                sendMsgtoClient("<#CHOOSEVIEW#>INSTRUNUM#"+ans);
+                updateTeamInfo(sessionID);
+            }
         }
         public void onCreateView(String msg) {
             String[] msgSplits = msg.split("#");
             //进行游戏状态的修改
             if(msgSplits[0].equals("teamstate")) {
                 MainThread.SSIDtoCLIENTSA.get(sessionID).teamState = Integer.parseInt(msgSplits[1]);
-            } else if(msgSplits[0].equals("MusicList")) {
+            } else
+            if(msgSplits[0].equals("MusicList")) {   //需要提供附属乐器的信息
                 IOManager io = new IOManager("MusicList",IOManager.FILE_READ,false);
                 String ans = io.read();
                 io.onDestroy();
-                sendMsgtoClient("<#CREATEVIEW#>"+ans);
+                StringBuffer builder = new StringBuffer();
+                String[] nameList = ans.split("\\$\\$");
+                for(int i=0;i<nameList.length;i++) {
+                    IOManager info = new IOManager(nameList[i],IOManager.FILE_READ,false);
+                    String instruInfo = info.read();
+                    builder.append(instruInfo+"#");
+                }
+                sendMsgtoClient("<#CREATEVIEW#>"+ans+"#"+builder.toString());
             }
         }
 
