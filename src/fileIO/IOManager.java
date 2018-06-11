@@ -38,7 +38,7 @@ public class IOManager {
         String line;
         try {
             while ((line = reader.readLine()) != null) {
-                builder.append(line);
+                builder.append(line+"$$");
             }
         } catch(Exception e) {
             e.printStackTrace();

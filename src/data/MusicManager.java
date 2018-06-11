@@ -22,6 +22,13 @@ public class MusicManager {
             ls.onDestroy();
         }
         clientNum++;
+        //记录该组内的乐器组成
+        String[] msgSplits = msg.split("-");
+        char type = msgSplits[0].charAt(msgSplits[0].length()-1);
+        IOManager info = new IOManager(msgSplits[0].substring(0,msgSplits[0].length()-1),IOManager.FILE_WRITE,true);
+        info.write(String.format("%c\n",type));
+        info.onDestroy();
+
         addMusicInstru(name,msg);
     }
     public void onMusicOver(ClientTeamData data)  {    //小组内的所有成员都已经退出

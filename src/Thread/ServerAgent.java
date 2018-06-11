@@ -2,6 +2,7 @@ package Thread;
 
 import data.ClientTeamData;
 import data.MusicManager;
+import fileIO.IOManager;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -50,10 +51,6 @@ public class ServerAgent extends Thread {
                 if (msg.startsWith("<#CONNECT#>")) {
                     if (!addAClient(msg)) {
                     }
-                } else if(msg.startsWith('#CONNECT2#')) {
-                    if(!addAClient(msg)) {
-                    }
-                    MainThread.SSIDtoCLIENTSA.get(sessionID).connectType = 1;       //连接类型
                 } else if (msg.startsWith("<#EXIT#>")) {
                     removeAClient(msg);
                 } else if (msg.startsWith("<#DANMAKU#>")) {
@@ -70,10 +67,16 @@ public class ServerAgent extends Thread {
                     activityWait(msg,msgSplits);
                 } else if(msg.startsWith("<#MUSICOVERVIEW#>")) {
                     msg = msg.substring(17);
-                    if(msg.startsWith("MUSICSENDED")) {
+                    if (msg.startsWith("MUSICSENDED")) {
                         msg = msg.substring(12);
                         onMusicReceived(msg);
                     }
+                } else if(msg.startsWith("<#CHOOSEVIEW#>")) {
+                    msg = msg.substring(14);
+                    onChooseView(msg);
+                } else if(msg.startsWith("<#CREATEVIEW#>")) {
+                    msg = msg.substring(14);
+                    onCreateView(msg);
                 }
             } catch (Exception e) {
                 //客户端退出需要对该客户端的所有相关信息进行清空
@@ -107,7 +110,8 @@ public class ServerAgent extends Thread {
             } else {
                 //需要对新加入的client进行检查 如果team已经在游戏 则不能加入
                 clientType = ServerAgent.CLIENTYPE_NOARMAL;
-                if (MainThread.SSIDtoCLIENTSA.get(msgSplits[1]) == null) {
+                if (MainThread.SSIDtoCLIENTSA.get(msgSplits[1]) == null
+                        || MainThread.SSIDtoCLIENTSA.get(msgSplits[1]).teamState==-1) {
                     sendMsgtoClient("<#CONNECT#>ERROR2");
                     return false;
                 }
@@ -254,6 +258,27 @@ public class ServerAgent extends Thread {
             if(isLeader==CLIENTYPE_NOARMAL) MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.remove(this);
             int size = MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.size();
             sendMsgtoTeam(sessionID,String.format("<#MUSICOVERVIEW#>NUMBER#%d",size));
+        }
+        public void onChooseView(String msg) {
+            String[] msgSplits = msg.split("#");
+            String filename = msgSplits[1];
+            IOManager reader = new IOManager(filename,IOManager.FILE_READ,false);
+            String ans = reader.read();
+            ans = ans.replace('\n',' ');
+            reader.onDestroy();
+            sendMsgtoClient(ans);
+        }
+        public void onCreateView(String msg) {
+            String[] msgSplits = msg.split("#");
+            //进行游戏状态的修改
+            if(msgSplits[0].equals("teamstate")) {
+                MainThread.SSIDtoCLIENTSA.get(sessionID).teamState = Integer.parseInt(msgSplits[1]);
+            } else if(msgSplits[0].equals("MusicList")) {
+                IOManager io = new IOManager("MusicList",IOManager.FILE_READ,false);
+                String ans = io.read();
+                io.onDestroy();
+                sendMsgtoClient("<#CREATEVIEW#>"+ans);
+            }
         }
 
         //------------Util Module------------------------

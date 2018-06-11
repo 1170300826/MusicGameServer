@@ -7,7 +7,7 @@ import java.util.ArrayList;
 
 public class ClientTeamData {
     public int connectType;     //标志着连接的类型 0-编曲activity 1-play流程
-    public int teamState;       //0-选择等待界面 1-游戏进行
+    public int teamState;       //-1 - 不允许成员加入  0-等待界面 1-游戏已经开始
     public int mateNumber;
     public ArrayList<ServerAgent> listsa; //所有serverAgent的句柄
     public int[] instruFlag;            //四个乐器的标志
@@ -18,7 +18,7 @@ public class ClientTeamData {
     public ClientTeamData() {
         connectType = 0;
         date = "";
-        teamState = 0;
+        teamState = -1;
         mateNumber = 0;
         musicName = "";
         listsa = new ArrayList<>();
