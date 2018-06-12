@@ -240,25 +240,29 @@ public class ServerAgent extends Thread {
                         }
 
                     }
-                } else if(msgSplits[0].equals("STARTGAME")) {
+                } else if(msgSplits[0].equals("STARTGAME")||msgSplits[0].startsWith("STARTGAME&MUSIC")) {
                 int[]  instruFlag = data.instruFlag;
                 MainThread.SSIDtoCLIENTSA.get(sessionID).teamState = 1;
                 int cnt = 0;
                 for(int i=0;i<4;i++) if(instruFlag[i]!=-1) cnt++;
                 if(cnt==data.listsa.size()) {
-                    sendMsgtoTeam(sessionID,msg);
-                } else {
-                    sendMsgtoClient("<#WAITVIEW#>STARTFALSE1");     //不是所有的成员都已经选中了乐器
+                    if(msgSplits[0].equals("STARTGAME")) {
+                        sendMsgtoTeam(sessionID,msg);
+                    } else if(msgSplits[0].startsWith("STARTGAME&MUSIC")) {
+                        int instruType = Integer.parseInt(msgSplits[1]);
+                        String fname = data.chooseMusicName;
+                        int x = fname.indexOf("-");
+                        fname = fname.substring(0,x)+Integer.toString(instruType)+fname.substring(x);
+                        IOManager io = new IOManager(fname,IOManager.FILE_READ,false);
+                        String ans = io.read();
+                        io.onDestroy();
+                        sendMsgtoClient("<#WAITVIEW#>STARTGAME&MUSIC#"+ans);
+                    }
+                } else if(cnt<data.listsa.size()) {
+                    sendMsgtoClient("<#WAITVIEW#>STARTFALSE1");
                 }
             } else if(msgSplits[0].startsWith("STARTGAME&MUSIC")) {
-                int instruType = Integer.parseInt(msgSplits[1]);
-                String fname = data.chooseMusicName;
-                int x = fname.indexOf("-");
-                fname = fname.substring(0,x)+Integer.toString(instruType)+fname.substring(x);
-                IOManager io = new IOManager(fname,IOManager.FILE_READ,false);
-                String ans = io.read();
-                io.onDestroy();
-                sendMsgtoClient("<#WAITVIEW#>STARTGAME&MUSIC#"+ans);
+
             } else if(msgSplits[0].startsWith("INSTRUNUMLIMIT")) {
                     MainThread.SSIDtoCLIENTSA.get(sessionID).teamNumberLimit = Integer.parseInt(msgSplits[1].trim());
                 }
