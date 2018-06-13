@@ -4,6 +4,9 @@ import java.io.*;
 
 public class test {
     public static void main(String[] args) {
+        int[] key = {
+                0,1,3,5,6,8,10,12,13,2,4,7,9,11
+        };
         FileInputStream in = null;
         BufferedReader reader = null;
         FileOutputStream out = null;
@@ -22,7 +25,9 @@ public class test {
                 String[] strs = line.trim().split(" ");
                 int t1 = Integer.parseInt(strs[1].trim());
                 int t2 = Integer.parseInt(strs[2].trim());
-                String ans = String.format("%d %d %s", t1 * 400, (t1 + t2) * 400,strs[0]);
+                int k = Integer.parseInt(strs[0].trim());
+                String ans = String.format("%d %d %d", t1 * 400, (t1 + t2) * 400,key[k])
+                        ;
                 writer.write(ans+"\n");
             }
             writer.flush();

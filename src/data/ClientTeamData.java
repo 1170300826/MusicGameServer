@@ -10,6 +10,8 @@ public class ClientTeamData {
     public String chooseMusicName;
     public int teamState;               //0-未开始游戏 1-已开始游戏
     public int teamNumberLimit;       //队伍中队员数量的限制
+    public int mateGameOver;
+    public int[] mateFinalScore;
     public ArrayList<ServerAgent> listsa; //所有serverAgent的句柄
     public int[] instruFlag;            //四个乐器的标志
     public boolean[] uploadFlag = new boolean[4];        //上传乐谱的标志
@@ -27,6 +29,8 @@ public class ClientTeamData {
         chooseMusicName = "";
         strInstruNum="";
         listsa = new ArrayList<>();
+        mateFinalScore = new int[4];
+        for(int i=0;i<4;i++) mateFinalScore[i]=0;
         instruFlag = new int[4];
         for(int i=0;i<4;i++) uploadFlag[i]=false;
         for(int i=0;i<4;i++) instruFlag[i]=-1;

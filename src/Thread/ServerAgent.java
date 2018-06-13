@@ -3,6 +3,7 @@ package Thread;
 import data.ClientTeamData;
 import data.MusicManager;
 import fileIO.IOManager;
+import sun.applet.Main;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -77,6 +78,9 @@ public class ServerAgent extends Thread {
                 } else if(msg.startsWith("<#CREATEVIEW#>")) {
                     msg = msg.substring(14);
                     onCreateView(msg);
+                } else if(msg.startsWith("<#MUTIPLAYVIEW#>")) {
+                    msg = msg.substring(16);
+                    onMutiPlayView(msg);
                 }
             } catch (Exception e) {
                 //客户端退出需要对该客户端的所有相关信息进行清空
@@ -198,10 +202,7 @@ public class ServerAgent extends Thread {
         public void broadDanmaku (String msg){
             msg = msg.substring(11);
             String[] msgSplits = msg.split("#");
-            ArrayList<ServerAgent> listsa = MainThread.SSIDtoCLIENTSA.get(sessionID).listsa;
-            for (ServerAgent sa : listsa) {
-                sa.sendMsgtoClient("<#DANMAKU#>" + msg);
-            }
+            sendMsgtoTeam(sessionID,"<#DANMAKU#>" + msg);
         }
         public void setFlag ( boolean flag){
             this.flag = flag;
@@ -313,6 +314,44 @@ public class ServerAgent extends Thread {
                     builder.append(instruInfo+"#");
                 }
                 sendMsgtoClient("<#CREATEVIEW#>"+ans+"#"+builder.toString());
+            }
+        }
+        public void onMutiPlayView(String msg) {
+            if(msg.startsWith("GAMEOVER")) {
+                ClientTeamData data = MainThread.SSIDtoCLIENTSA.get(sessionID);
+                msg = msg.substring(9);
+                //需要向所有的已有MUTIPLAYVIEW发送信息
+                String finalMsg = msg;
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            Thread.sleep(300);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                        int x=0;
+                        for(int i=0;i<4;i++) if(data.instruFlag[i]==clockID) break;
+                        sendMsgtoTeam(sessionID, String.format("<#MUTIRES#>ADDRES#%d#",x) + finalMsg);
+                        for (int i = 0; i < 4; i++) {
+                            if (data.mateFinalScore[i] == 0) {
+                                data.mateFinalScore[i] = Integer.parseInt(finalMsg.split("#")[1].trim());
+                                break;
+                            }
+                        }
+                        if ((++data.mateGameOver) >= data.listsa.size()) {
+                            //需要计算总得分
+                            try {
+                                Thread.sleep(300);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                            int ans = 0;
+                            for (int i = 0; i < 4; i++) ans += data.mateFinalScore[i];
+                            sendMsgtoTeam(sessionID, "<#MUTIRES#>GAMEOVER#" + ans);
+                        }
+                    }
+                }).start();
             }
         }
 
