@@ -12,9 +12,9 @@ public class test {
         FileOutputStream out = null;
         BufferedWriter writer = null;
         try {
-            in = new FileInputStream("musicscore.txt");
+            in = new FileInputStream("小白兔乖乖.txt");
             reader = new BufferedReader(new InputStreamReader(in));
-            out = new FileOutputStream("musicscore2.txt");
+            out = new FileOutputStream("小白兔乖乖2.txt");
             writer = new BufferedWriter(new OutputStreamWriter(out));
         } catch(Exception e) {
             e.printStackTrace();
@@ -23,11 +23,11 @@ public class test {
         try {
             while ((line = reader.readLine()) != null) {
                 String[] strs = line.trim().split(" ");
+                System.out.println(line);
                 int t1 = Integer.parseInt(strs[1].trim());
                 int t2 = Integer.parseInt(strs[2].trim());
                 int k = Integer.parseInt(strs[0].trim());
-                String ans = String.format("%d %d %d", t1 * 400, (t1 + t2) * 400,key[k])
-                        ;
+                String ans = String.format("%d %d %d", t1 * 400, ( t2) * 400,key[k]);
                 writer.write(ans+"\n");
             }
             writer.flush();

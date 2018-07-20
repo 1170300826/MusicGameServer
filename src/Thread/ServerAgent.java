@@ -250,6 +250,7 @@ public class ServerAgent extends Thread {
                     if(msgSplits[0].equals("STARTGAME")) {
                         sendMsgtoTeam(sessionID,msg);
                     } else if(msgSplits[0].startsWith("STARTGAME&MUSIC")) {
+                        //还需要向组员发送开始游戏的信号
                         int instruType = Integer.parseInt(msgSplits[1]);
                         String fname = data.chooseMusicName;
                         int x = fname.indexOf("-");
@@ -257,7 +258,11 @@ public class ServerAgent extends Thread {
                         IOManager io = new IOManager(fname,IOManager.FILE_READ,false);
                         String ans = io.read();
                         io.onDestroy();
-                        sendMsgtoClient("<#WAITVIEW#>STARTGAME&MUSIC#"+ans);
+                        if(msgSplits[0].equals("STARTGAME&MUSIC")) {
+                            sendMsgtoTeam(sessionID,"<#WAITVIEW#>STARTGAME&MUSIC#" + ans);
+                        } else if(msgSplits[0].equals("STARTGAME&MUSIC2")){
+                            sendMsgtoClient("<#WAITVIEW#>STARTGAME&MUSIC2#"+ans);
+                        }
                     }
                 } else if(cnt<data.listsa.size()) {
                     sendMsgtoClient("<#WAITVIEW#>STARTFALSE1");
@@ -281,7 +286,7 @@ public class ServerAgent extends Thread {
             //需要向leader发送 更新人数信息的msg
             if(isLeader==CLIENTYPE_NOARMAL) MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.remove(this);
             int size = MainThread.SSIDtoCLIENTSA.get(sessionID).listsa.size();
-            sendMsgtoTeam(sessionID,String.format("<#MUSICOVERVIEW#>NUMBER#%d",size));
+            sendMsgtoTeam(sessionID,String.format("<#MUSICOVERVIEW#>NUMBER#%d",size-1));
         }
         public void onChooseView(String msg) {
             String[] msgSplits = msg.split("#");
@@ -321,7 +326,7 @@ public class ServerAgent extends Thread {
                 ClientTeamData data = MainThread.SSIDtoCLIENTSA.get(sessionID);
                 msg = msg.substring(9);
                 //需要向所有的已有MUTIPLAYVIEW发送信息
-                String finalMsg = msg;
+                final String finalMsg = msg;
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
@@ -330,9 +335,7 @@ public class ServerAgent extends Thread {
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
-                        int x=0;
-                        for(int i=0;i<4;i++) if(data.instruFlag[i]==clockID) break;
-                        sendMsgtoTeam(sessionID, String.format("<#MUTIRES#>ADDRES#%d#",x) + finalMsg);
+                        sendMsgtoTeam(sessionID,"<#MUTIRES#>ADDRES#"+finalMsg);
                         for (int i = 0; i < 4; i++) {
                             if (data.mateFinalScore[i] == 0) {
                                 data.mateFinalScore[i] = Integer.parseInt(finalMsg.split("#")[1].trim());
@@ -348,7 +351,7 @@ public class ServerAgent extends Thread {
                             }
                             int ans = 0;
                             for (int i = 0; i < 4; i++) ans += data.mateFinalScore[i];
-                            sendMsgtoTeam(sessionID, "<#MUTIRES#>GAMEOVER#" + ans);
+                            sendMsgtoTeam(sessionID, String.format("<#MUTIRES#>GAMEOVER#%d",ans));
                         }
                     }
                 }).start();
